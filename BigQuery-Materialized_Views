@@ -1,0 +1,53 @@
+--Materialized view-1
+
+create or replace materialized view q-gcp-buc1-fsi-training-23-03.suman.mv_1 as
+SELECT gender,
+CASE
+WHEN age < 30 THEN '18-29'
+WHEN age < 40 THEN '30-39'
+WHEN age < 50 THEN '40-49'
+ELSE '50+'
+END as age_group,
+AVG(claim) as avg_claim
+FROM `q-gcp-buc1-fsi-training-23-03.suman.Curated_insurance_data`
+GROUP BY gender, age_group;
+
+
+--Materialized view-2
+
+create or replace materialized view q-gcp-buc1-fsi-training-23-03.suman.mv_2 as
+SELECT bmi_category,
+bloodpressure_category,
+AVG(claim) as average_claim
+FROM `q-gcp-buc1-fsi-training-23-03.suman.Curated_insurance_data`
+GROUP BY bmi_category, bloodpressure_category;
+
+--Materialized view-3
+
+create or replace table q-gcp-buc1-fsi-training-23-03.suman.risk_table as( select
+case
+when t1.risk_score>=50 then 'very high'
+when t1.risk_score<50 and t1.risk_score>=40 then 'high'
+when t1.risk_score<40 and risk_score>=30 then 'medium'
+else 'low'
+end as risk_group,count(*) as num_policies,
+round((sum(t1.claim)),2) as total_claim,
+round((avg(t1.claim)),2) as avg_claim
+from(select patientid,
+round(((0.4*age)+(0.2*bloodpressure)+
+(0.2*case when diabetic ='Yes' then 1 else 0 end)+
+(0.2 * case when smoker='Yes' then 1 else 0 end)+(0.1*bmi)+
+(0.1* case when gender='female' then 1 else 0 end)+
+(0.05*children)),2) as risk_score,claim
+FROM `q-gcp-buc1-fsi-training-23-03.suman.Curated_insurance_data`)t1
+group by risk_group
+order by
+case
+when risk_group='very high' then 1
+when risk_group='high' then 2
+when risk_group='medium' then 3
+else 4
+end);
+create or replace materialized view q-gcp-buc1-fsi-training-23-03.suman.mv_3 as
+select * from q-gcp-buc1-fsi-training-23-03.suman.risk_table;
+select * from q-gcp-buc1-fsi-training-23-03.suman.mv_3 order by avg_claim desc;
